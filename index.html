@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<title>SearDocs — Facturas y Cotizaciones | Searpix</title>
+<meta name="description" content="SearDocs — Crea facturas y cotizaciones para compartirlas con tus clientes, evita complejos procesos y optimiza tu negocio. ¿Qué esperas para adquirir uno de nuestros planes? Impulsa tu negocio.">
+<link rel="icon" type="image/png" href="../img/logo.png">
+<link rel="apple-touch-icon" href="../img/logo.png">
+<link rel="stylesheet" href="../assets/css/auth.css">
+<link rel="stylesheet" href="../assets/css/responsive.css">
+<!-- Librerías del PDF: se cargan primero desde el propio servidor (no dependen de un CDN externo)
+     y solo usan el CDN como respaldo si el archivo local no estuviera disponible. -->
+<script>
+(function(){
+  function loadScript(src){
+    return new Promise(function(resolve,reject){
+      var s=document.createElement("script");
+      s.src=src; s.async=false;
+      s.onload=function(){resolve(src);};
+      s.onerror=function(){reject(new Error("No se pudo cargar "+src));};
+      document.head.appendChild(s);
+    });
+  }
+  // Promesa global que garantiza que jsPDF y html2canvas estén listos antes de exportar.
+  window.__seardocsLibsReady=(async function(){
+    // html2canvas: local primero, CDN de respaldo.
+    if(typeof window.html2canvas!=="function"){
+      try{ await loadScript("vendor/html2canvas.min.js?v=1"); }catch(e){}
+    }
+    if(typeof window.html2canvas!=="function"){
+      try{ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"); }catch(e){}
+    }
+    // jsPDF: local primero, CDN de respaldo.
+    if(!(window.jspdf&&window.jspdf.jsPDF)){
+      try{ await loadScript("vendor/jspdf.umd.min.js?v=1"); }catch(e){}
+    }
+    if(!(window.jspdf&&window.jspdf.jsPDF)){
+      try{ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"); }catch(e){}
+    }
+  })();
+})();
+</script>
+<style>
+:root{
+ --sp-blue:#7c3aed;--sp-blue-dark:#5b21b6;--sp-navy:#0b0b12;
+ --sp-text:#17202a;--sp-muted:#667085;--sp-line:#e5e7eb;
+ --sp-soft:#f6f8fb;--sp-card:#fff;--sp-bg:#f4f2fb;
+ --sp-grad:linear-gradient(135deg,#7c3aed 0%,#a855f7 55%,#5b21b6 100%);
+ --sp-dark:#0b0b12;--sp-radius:14px;
+ --sp-shadow:0 18px 50px rgba(30,16,60,.12);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:
+  radial-gradient(1100px 520px at 88% -8%,rgba(124,58,237,.14),transparent 60%),
+  radial-gradient(900px 480px at 5% 4%,rgba(168,85,247,.10),transparent 55%),
+  var(--sp-bg);
+ color:var(--sp-text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+a{text-decoration:none;color:inherit}
+
+/* ==========================================================
+   NAVEGACIÓN SEARPIX — responsive
+   ========================================================== */
+.sear-nav{
+ height:74px;min-height:74px;background:rgba(11,11,18,.92);
+ -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+ border-bottom:1px solid rgba(124,58,237,.35);
+ box-shadow:0 4px 22px rgba(11,11,18,.28);
+ display:flex;align-items:center;justify-content:space-between;
+ padding:0 clamp(16px,4vw,56px);position:sticky;top:0;z-index:100
+}
+.sear-brand{display:inline-flex;align-items:center;gap:10px;min-width:max-content;
+ font-weight:900;letter-spacing:-.045em;font-size:21px}
+.sear-brand img{width:35px;height:35px;object-fit:contain;border-radius:9px}
+.sear-brand span{color:#fff}
+.sear-nav-links{display:flex;align-items:center;justify-content:flex-end;
+ gap:clamp(16px,2.2vw,30px);font-size:14px;font-weight:650;color:#c9c9d6}
+.sear-nav-links a{position:relative;padding:27px 0;color:#c9c9d6;
+ transition:color .18s ease;white-space:nowrap}
+.sear-nav-links a::after{content:"";position:absolute;left:0;right:0;bottom:18px;
+ height:2px;border-radius:99px;background:var(--sp-blue);transform:scaleX(0);
+ transform-origin:center;transition:transform .18s ease}
+.sear-nav-links a:hover,.sear-nav-links a.active{color:var(--sp-blue)}
+.sear-nav-links a:hover::after,.sear-nav-links a.active::after{transform:scaleX(1)}
+.nav-product{color:var(--sp-blue)!important}
+.nav-toggle{display:none;width:42px;height:42px;border:1px solid rgba(124,58,237,.4);
+ border-radius:11px;background:rgba(255,255,255,.06);color:#fff;font-size:22px;line-height:1;
+ align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(11,11,18,.3)}
+
+/* app header */
+.appbar{
+ min-height:70px;background:#fff;border-bottom:1px solid var(--sp-line);
+ display:flex;align-items:center;justify-content:space-between;gap:18px;
+ padding:12px clamp(14px,2.5vw,24px);position:sticky;top:74px;z-index:40
+}
+.app-title{display:flex;align-items:center;gap:12px;min-width:0}
+.app-icon{width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:var(--sp-grad);
+ display:grid;place-items:center;color:#fff;font-weight:900;box-shadow:0 6px 16px rgba(124,58,237,.28)}
+.app-name{font-size:17px;font-weight:850;line-height:1.15}
+.app-sub{font-size:11px;color:var(--sp-muted);margin-top:2px}
+.save-status{display:inline-flex;align-items:center;max-width:260px;font-size:11px;color:#667085;
+ background:#f8fafc;border:1px solid var(--sp-line);padding:7px 10px;border-radius:999px;
+ white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.btn{border:1px solid var(--sp-line);background:#fff;border-radius:10px;padding:9px 13px;
+ font-weight:750;color:#344054;transition:background .18s ease,transform .18s ease,box-shadow .18s ease;
+ white-space:nowrap}
+.btn:hover{background:#f8fafc;transform:translateY(-1px)}
+.btn:focus-visible,.nav-toggle:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{
+ outline:3px solid rgba(124,58,237,.15);outline-offset:1px}
+.btn.primary{background:var(--sp-grad);border-color:transparent;color:#fff;
+ box-shadow:0 8px 20px rgba(124,58,237,.28)}
+.btn.primary:hover{filter:brightness(1.05);box-shadow:0 10px 26px rgba(124,58,237,.34)}
+.btn.danger{color:#b42318}
+
+.workspace{display:grid;grid-template-columns:minmax(300px,420px) minmax(0,1fr);
+ min-height:calc(100vh - 144px)}
+.editor{background:#fff;border-right:1px solid var(--sp-line);overflow:auto;
+ height:calc(100vh - 144px);padding:clamp(16px,2vw,22px);min-width:0}
+.preview{overflow:auto;padding:clamp(18px,4vw,38px);display:flex;
+ justify-content:center;align-items:flex-start;min-width:0}
+.editor-note{font-size:11px;line-height:1.5;color:var(--sp-muted);background:#f8fafc;border:1px solid var(--sp-line);padding:11px 12px;border-radius:10px;margin-bottom:18px}
+.editor-note b{color:#344054}
+.section{padding-bottom:21px;margin-bottom:21px;border-bottom:1px solid var(--sp-line)}
+.section:last-child{border:0}.section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.section h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.085em}.section small{color:var(--sp-muted)}
+.field{margin-bottom:11px}.field label{display:block;font-size:12px;font-weight:750;color:#475467;margin-bottom:5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+input,select,textarea{width:100%;border:1px solid #d0d5dd;border-radius:8px;background:#fff;padding:9px 10px;color:var(--sp-text);outline:0}
+textarea{resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--sp-blue);box-shadow:0 0 0 3px rgba(124,58,237,.09)}
+.type-tabs{display:grid;grid-template-columns:1fr 1fr;background:#f2f4f7;border-radius:9px;padding:3px;margin-bottom:13px}
+.type-tabs button{border:0;background:transparent;padding:8px;border-radius:7px;font-weight:750;color:#667085}
+.type-tabs button.active{background:#fff;color:var(--sp-blue);box-shadow:0 1px 4px #00000012}
+.item{border:1px solid var(--sp-line);border-radius:12px;padding:10px;margin-bottom:9px;background:#fbfcfd;transition:box-shadow .18s ease,border-color .18s ease}
+.item:hover{border-color:#cdd7e6;box-shadow:0 6px 18px rgba(16,24,40,.06)}
+.item.dragging{opacity:.45;border-style:dashed}
+.item.drag-over{border-color:var(--sp-blue);box-shadow:0 0 0 2px rgba(124,58,237,.10)}
+.item-top{display:grid;grid-template-columns:30px 1fr 34px;gap:7px;align-items:center}
+.item-name{font-weight:700}
+.item-description{font-size:12px!important;color:#667085!important;margin-top:7px}
+.item-bottom{display:grid;grid-template-columns:75px 1fr;gap:7px;margin-top:7px}
+.item-actions{display:flex;flex-direction:column;gap:3px}
+.drag-handle,.move-btn,.remove{border:1px solid var(--sp-line);background:#fff;border-radius:7px;color:#667085;min-height:32px}
+.drag-handle{cursor:grab;font-size:15px;line-height:1}
+.drag-handle:active{cursor:grabbing}
+.move-btn{font-size:12px;padding:0 6px}
+.move-btn:disabled{opacity:.35;cursor:not-allowed}
+.remove{font-size:18px}.remove:hover{color:#b42318}
+.add-row{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.add{width:100%;border:1px dashed #b8c0cc;background:#fafbfc;border-radius:8px;padding:10px;font-weight:750;color:#475467}
+.add:hover{background:#f4f6f8}
+.blank-row td{height:38px}
+.blank-row .blank-space{display:block;height:18px}
+.logo-input{display:flex;gap:8px;align-items:center}.logo-thumb{width:54px;height:40px;object-fit:contain;border:1px solid var(--sp-line);border-radius:7px}
+
+
+/* Compartir / cargar progreso */
+.remote-modal{position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000}
+.remote-modal.open{display:flex}
+.remote-card{width:min(470px,100%);background:#fff;border:1px solid var(--sp-line);border-radius:16px;box-shadow:0 24px 80px rgba(15,23,42,.22);padding:24px}
+.remote-card h3{margin:0 0 7px;font-size:20px}
+.remote-card p{margin:0 0 18px;color:var(--sp-muted);font-size:13px;line-height:1.5}
+.remote-code{font-size:26px!important;font-weight:850!important;letter-spacing:.14em;text-align:center;text-transform:uppercase}
+.remote-status{font-size:12px;color:var(--sp-muted);min-height:18px;margin-top:8px}
+.remote-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
+.current-code{font-size:11px;color:#475467;background:#f8fafc;border:1px solid var(--sp-line);padding:5px 8px;border-radius:999px;display:none}
+.current-code.visible{display:inline-flex}
+@media (max-width:900px){
+ .actions{flex-wrap:wrap;justify-content:flex-end}
+}
+
+/* A4 document */
+.paper{width:794px;max-width:100%;min-height:1123px;background:#fff;
+ box-shadow:var(--sp-shadow);padding:58px 60px 48px;position:relative;border-radius:16px;
+ display:flex;flex-direction:column}
+.vacio{flex:0 0 auto;height:8px}
+.doc-header{display:flex;justify-content:space-between;gap:35px;border-bottom:3px solid #0b0b12;padding-bottom:20px}
+.issuer{min-width:0;flex:1}
+.issuer-main{display:flex;align-items:center;gap:18px;min-width:0}
+.logo{width:108px;height:108px;max-width:108px;max-height:108px;object-fit:contain;flex:0 0 108px}
+.issuer-details{min-width:0;padding-top:2px}
+.company{font-size:22px;font-weight:850;letter-spacing:-.025em;line-height:1.15}
+.company-data{font-size:9.5px;color:#667085;line-height:1.55;margin-top:7px;max-width:430px}
+.company-data b{font-weight:750;color:#475467}
+.company-data span{display:inline}
+.doc-title{text-align:right;min-width:205px}.doc-title h1{font-size:27px;margin:0 0 7px;letter-spacing:.04em}
+.meta{font-size:10.5px;color:#667085;line-height:1.7}.meta b{color:#344054}
+.info{display:grid;grid-template-columns:1fr 1fr;gap:35px;margin:27px 0}
+.info-label{font-size:9.5px;font-weight:850;color:#0b0b12;text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px}
+.info-value{font-size:11px;line-height:1.6;min-height:45px}
+.doc-table{width:100%;border-collapse:collapse;font-size:10.5px}
+.doc-table th{background:#f3f5f7;color:#475467;font-size:9.5px;text-transform:uppercase;letter-spacing:.035em;text-align:left;padding:9px;border-bottom:1px solid #dfe3e8}
+.doc-table td{padding:10px 9px;border-bottom:1px solid #eaecf0;vertical-align:top}.doc-table .right{text-align:right;white-space:nowrap}
+.concept-title{font-weight:750;color:#27303b}.concept-desc{display:block;color:#98a2b3;font-size:9.2px;line-height:1.35;margin-top:3px}
+.totals{width:275px;margin:17px 0 0 auto;font-size:11px}.total{display:flex;justify-content:space-between;padding:5px 0;color:#475467}
+.total.final{border-top:2px solid #1f2937;margin-top:5px;padding-top:9px;font-size:16px;font-weight:850;color:#17202a}
+.note-box{margin-top:30px;border-top:1px solid #eaecf0;padding-top:13px;font-size:9.8px;line-height:1.55;color:#667085}
+.note-box strong{display:block;color:#344054;font-size:10px;margin-bottom:4px}
+.bank-box{margin-top:16px;border-top:1px solid #eaecf0;padding-top:12px;font-size:9.8px;line-height:1.55;color:#667085}
+.bank-box strong{display:block;color:#344054;font-size:10px;margin-bottom:4px}
+.doc-title h1.long{font-size:17px;letter-spacing:.01em;line-height:1.2}
+.legal{margin-top:auto;border-top:1px solid #e5e7eb;padding-top:9px;font-size:7.6px;line-height:1.4;color:#8a94a3}
+.legal strong{color:#667085}.page-footer{margin-top:9px;text-align:center;font-size:7px;color:#a0a8b3}
+.page-footer-2{margin-top:4px;text-align:center;font-size:7px;color:#a0a8b3}
+
+/* ==========================================================
+   RESPONSIVE — escritorio, tablet y móvil
+   ========================================================== */
+@media(max-width:1100px){
+ .sear-nav-links{gap:18px}
+ .workspace{grid-template-columns:350px minmax(0,1fr)}
+ .preview{padding:22px}.paper{padding:46px 42px 42px}.doc-header{gap:22px}
+}
+@media(max-width:900px){
+ .sear-nav{height:68px;min-height:68px}
+ .sear-nav-links{position:absolute;top:68px;left:12px;right:12px;display:none;
+  flex-direction:column;align-items:stretch;gap:2px;padding:10px;background:rgba(11,11,18,.98);
+  border:1px solid rgba(124,58,237,.35);border-radius:14px;box-shadow:0 18px 45px rgba(11,11,18,.4)}
+ .sear-nav-links.open{display:flex}
+ .sear-nav-links a{padding:13px 14px;border-radius:9px}
+ .sear-nav-links a::after{display:none}
+ .sear-nav-links a:hover,.sear-nav-links a.active{background:rgba(124,58,237,.18)}
+ .nav-toggle{display:inline-flex}
+ .appbar{top:68px;align-items:flex-start;flex-wrap:wrap;padding:12px 14px}
+ .app-title{flex:1 1 280px}
+ .actions{flex:1 1 100%;justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;
+  padding-bottom:2px;scrollbar-width:thin}
+ .actions .btn{flex:0 0 auto}
+ .workspace{display:flex;flex-direction:column;min-height:0}
+ .editor{height:auto;max-height:none;border-right:0;border-bottom:1px solid var(--sp-line);overflow:visible}
+ .preview{display:block;overflow:auto;padding:20px 14px 30px;background:#eef2f7}
+ .paper{margin:0 auto;width:min(794px,100%);min-height:auto;padding:38px 32px 42px}
+}
+@media(max-width:640px){
+ body{font-size:14px}
+ .sear-nav{padding:0 13px}.sear-brand{font-size:19px}.sear-brand img{width:32px;height:32px}
+ .appbar{gap:10px}.app-title{flex-basis:100%}
+ .save-status{max-width:calc(100vw - 170px);font-size:10px}
+ .actions .btn{padding:9px 11px;font-size:12px}
+ .editor{padding:16px 13px}.grid2{grid-template-columns:1fr}.add-row{grid-template-columns:1fr}
+ .item-top{grid-template-columns:30px minmax(0,1fr) 34px}
+ .item-bottom{grid-template-columns:1fr 1fr}
+ .remote-card{padding:20px;border-radius:14px}
+ .preview{padding:12px 8px 24px}
+ .paper{width:100%;padding:28px 20px 36px;box-shadow:0 10px 28px rgba(16,24,40,.10)}
+ .doc-header{display:block;padding-bottom:15px}.issuer-main{gap:12px}
+ .logo{width:76px;height:76px;flex-basis:76px}.company{font-size:18px}.company-data{font-size:8.5px}
+ .doc-title{text-align:left;min-width:0;margin-top:17px}.doc-title h1{font-size:22px}
+ .info{grid-template-columns:1fr;gap:15px;margin:20px 0}.info-value{min-height:0}
+ .doc-table{font-size:9px}.doc-table th{font-size:8px;padding:7px 5px}.doc-table td{padding:8px 5px}
+ .concept-desc{font-size:8px}.totals{width:100%;max-width:275px}
+ .legal{position:static;margin-top:28px}.page-footer{position:static;margin-top:14px}
+ .legal{position:static;margin-top:28px}.page-footer-2{position:static;margin-top:11px}
+}
+@media(max-width:420px){
+ .sear-nav-links{left:8px;right:8px}.app-icon{width:36px;height:36px;flex-basis:36px}
+ .app-name{font-size:15px}.app-sub{font-size:10px}.save-status{display:none}
+ .editor{padding:14px 10px}.section{padding-bottom:17px;margin-bottom:17px}
+ .item-bottom{grid-template-columns:1fr}.paper{padding:22px 14px 30px}
+ .issuer-main{align-items:flex-start}.logo{width:64px;height:64px;flex-basis:64px}.company{font-size:16px}
+ .doc-table{font-size:8.2px}.doc-table th{font-size:7.3px}.doc-table td{padding:7px 3px}
+ .totals{font-size:10px}.total.final{font-size:14px}
+}
+@media print{
+ body{background:#fff}.sear-nav,.appbar,.editor{display:none!important}
+ .workspace{display:block;min-height:0}.preview{padding:0;background:#fff;overflow:visible}
+ .paper{box-shadow:none;margin:0;max-width:none}
+}
+</style>
+</head>
+<body>
+
+<!-- Navegación principal de Searpix: sin registro ni inicio de sesión -->
+<nav class="sear-nav">
+  <a class="sear-brand" href="../index.html" aria-label="Searpix">
+    <img src="../img/logo.png" alt="Searpix">
+    <span>Searpix</span>
+  </a>
+  <div class="sear-nav-links">
+    <a href="../index.html">Inicio</a>
+    <a href="../index.html#servicios">Servicios</a>
+    <a class="active nav-product" href="./">SearDocs</a>
+    <a href="../faq.html">Preguntas frecuentes</a>
+    <a href="../index.html#contacto">Contacto</a>
+  </div>
+  <button class="nav-toggle" aria-label="Abrir menú" onclick="toggleNav()">☰</button>
+</nav>
+
+<header class="appbar">
+  <div class="app-title">
+    <div class="app-icon"><img src="../img/logo.png"> </div>
+    <div><div class="app-name">SearDocs</div><div class="app-sub">Facturas y cotizaciones</div></div>
+    <span class="save-status" id="saveStatus">Guardado automáticamente</span><span class="current-code" id="currentCode"></span>
+  </div>
+  <div class="actions">
+    <button class="btn" onclick="openShareModal()">Compartir progreso</button>
+    <button class="btn" onclick="openLoadModal()">Cargar código</button>
+    <button class="btn" onclick="window.print()">Imprimir</button>
+    <button class="btn danger" onclick="resetDoc()">Nuevo</button>
+    <button class="btn primary" onclick="exportPDF()">Descargar PDF</button>
+  </div>
+</header>
+
+
+<div class="remote-modal" id="shareModal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+  <div class="remote-card">
+    <h3 id="shareTitle">Compartir progreso</h3>
+    <p>Genera un código único para que otra persona pueda abrir exactamente este documento y continuar desde donde lo dejaste.</p>
+    <input id="generatedCode" class="remote-code" readonly placeholder="CÓDIGO">
+    <div class="remote-status" id="shareStatus"></div>
+    <div class="remote-actions">
+      <button class="btn" type="button" onclick="closeRemoteModals()">Cerrar</button>
+      <button class="btn" type="button" onclick="copyGeneratedCode()">Copiar código</button>
+      <button class="btn primary" type="button" onclick="saveRemoteProgress(true)">Guardar y generar código</button>
+    </div>
+  </div>
+</div>
+
+<div class="remote-modal" id="loadModal" role="dialog" aria-modal="true" aria-labelledby="loadTitle">
+  <div class="remote-card">
+    <h3 id="loadTitle">Cargar progreso</h3>
+    <p>Introduce el código que te compartieron. El documento actual será reemplazado por el progreso guardado con ese código.</p>
+    <input id="loadCode" class="remote-code" maxlength="20" autocomplete="off" spellcheck="false" placeholder="EJ: A7K9-2M4Q-X8P3">
+    <div class="remote-status" id="loadStatus"></div>
+    <div class="remote-actions">
+      <button class="btn" type="button" onclick="closeRemoteModals()">Cancelar</button>
+      <button class="btn primary" type="button" onclick="loadRemoteProgress()">Cargar progreso</button>
+    </div>
+  </div>
+</div>
+
+<div class="workspace">
+<aside class="editor">
+  <div class="editor-note">
+    <b>SearDocs guarda tu progreso automáticamente.</b><br>
+    El documento se conserva localmente en este navegador. Usa <b>Compartir progreso</b> para generar un código y continuar el mismo documento desde otro dispositivo.
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Documento</h3></div>
+    <div class="type-tabs">
+      <button id="tabQuote" class="active" onclick="setType('COTIZACIÓN')">Cotización</button>
+      <button id="tabInvoice" onclick="setType('FACTURA')">Factura</button>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Número de documento</label><input id="number" value="COT-0001" oninput="render()"></div>
+      <div class="field"><label>Fecha</label><input id="date" type="date" oninput="render()"></div>
+    </div>
+    <div class="field" id="validField"><label>Válido hasta</label><input id="valid" type="date" oninput="render()"></div>
+    <div class="field"><label>IVA (%)</label><input id="tax" type="number" min="0" step=".01" value="19" oninput="render()"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Datos del emisor</h3></div>
+    <div class="field"><label>Logo</label><div class="logo-input"><input id="logo" type="file" accept="image/*"><img id="logoThumb" class="logo-thumb" src="../img/logo.png" alt="Logo"></div></div>
+    <div class="field"><label>Nombre / Razón social</label><input id="company" value="Mi Empresa S.A.S." oninput="render()"></div>
+    <div class="grid2">
+      <div class="field"><label>NIT / Identificación</label><input id="companyId" value="900.000.000-1" oninput="render()"></div>
+      <div class="field"><label>Teléfono</label><input id="companyPhone" value="+57 300 000 0000" oninput="render()"></div>
+    </div>
+    <div class="field"><label>Email</label><input id="companyEmail" value="contacto@empresa.com" oninput="render()"></div>
+    <div class="field"><label>Dirección</label><input id="companyAddress" value="Medellín, Colombia" oninput="render()"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Datos del cliente</h3></div>
+    <div class="field"><label>Nombre / Razón social</label><input id="client" value="Cliente de ejemplo" oninput="render()"></div>
+    <div class="grid2">
+      <div class="field"><label>NIT / Identificación</label><input id="clientId" oninput="render()"></div>
+      <div class="field"><label>Teléfono</label><input id="clientPhone" oninput="render()"></div>
+    </div>
+    <div class="field"><label>Email</label><input id="clientEmail" value="cliente@email.com" oninput="render()"></div>
+    <div class="field"><label>Dirección</label><input id="clientAddress" oninput="render()"></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Conceptos</h3><small>Nombre + descripción</small></div>
+    <div id="items"></div>
+    <div class="add-row">
+      <button class="add" type="button" onclick="addItem()">＋ Añadir concepto</button>
+      <button class="add" type="button" onclick="addBlankItem()">＋ Añadir espacio vacío</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Notas</h3></div>
+    <div class="field"><textarea id="notes" rows="4" oninput="render()">Gracias por confiar en nosotros.</textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Datos bancarios</h3><small>Opcional</small></div>
+    <div class="field"><textarea id="bank" rows="4" placeholder="Banco, tipo de cuenta, número de cuenta, titular..." oninput="render()"></textarea></div>
+  </div>
+
+  <div class="section">
+    <div class="section-title"><h3>Texto legal</h3><small>Automático</small></div>
+    <div style="font-size:11px;color:#667085;line-height:1.5">El pie legal se incorpora al PDF y sustituye automáticamente el número y la fecha por los datos del documento.</div>
+  </div>
+</aside>
+
+<main class="preview">
+<article class="paper" id="paper">
+  <div class="doc-header">
+    <div class="issuer">
+      <div class="issuer-main">
+        <img id="pLogo" class="logo" src="../img/logo.png" alt="Logo de la empresa">
+        <div class="issuer-details">
+          <div class="company" id="pCompany"></div>
+          <div class="company-data" id="pCompanyData"></div>
+        </div>
+      </div>
+    </div>
+    <div class="doc-title">
+      <h1 id="pType">COTIZACIÓN</h1>
+      <div class="meta"><b>N.º <span id="pNumber"></span></b><br>Fecha: <span id="pDate"></span><br><span id="pValidRow">Válido hasta: <span id="pValid"></span></span></div>
+    </div>
+  </div>
+
+  <div class="info">
+    <div><div class="info-label">Emitido por</div><div class="info-value" id="pIssuer"></div></div>
+    <div><div class="info-label">Cliente</div><div class="info-value" id="pClient"></div></div>
+  </div>
+
+  <table class="doc-table">
+    <thead><tr><th>Concepto</th><th class="right">Cant.</th><th class="right">Precio unitario</th><th class="right">Total</th></tr></thead>
+    <tbody id="pItems"></tbody>
+  </table>
+
+  <div class="vacio"> </div>
+
+  <div class="totals">
+    <div class="total"><span>Subtotal</span><b id="subtotal"></b></div>
+    <div class="total"><span id="taxLabel">IVA (19%)</span><b id="taxValue"></b></div>
+    <div class="total final"><span>TOTAL</span><span id="grandTotal"></span></div>
+  </div>
+
+  <div class="note-box"><strong>Notas / condiciones</strong><span id="pNotes"></span></div>
+  <div class="bank-box" id="pBankBox"><strong>Datos bancarios</strong><span id="pBank"></span></div>
+
+  <div class="legal" id="legalBox"></div>
+  <div class="page-footer">Documento generado con SearDocs · Searpix</div>
+  <div class="page-footer-2">INNOVATE · DEVELOP · ELEVATE</div>
+</article>
+</main>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const KEY="seardocs_document_v1";
+let type="COTIZACIÓN";
+let logoData="../img/logo.png";
+let items=[
+ {name:"Servicio o producto de ejemplo",description:"Descripción breve y detallada del concepto.",qty:1,price:150000},
+ {name:"Segundo concepto",description:"Información adicional del producto o servicio.",qty:2,price:75000}
+];
+
+function today(){
+ const d=new Date();
+ return new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+}
+function fmtDate(v){
+ if(!v)return "";
+ const [y,m,d]=v.split("-");
+ return `${d}/${m}/${y}`;
+}
+function money(v){
+ return new Intl.NumberFormat("es-CO",{style:"currency",currency:"COP",maximumFractionDigits:0}).format(v||0);
+}
+function esc(s){
+ return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+function setType(v){
+ type=v;
+ const isInvoice=v==="FACTURA";
+ $("tabQuote").classList.toggle("active",v==="COTIZACIÓN");
+ $("tabInvoice").classList.toggle("active",isInvoice);
+ $("validField").style.display=isInvoice?"none":"block";
+ // Ajuste automático del prefijo del número según el tipo (solo si sigue el patrón por defecto).
+ const numEl=$("number");
+ if(isInvoice&&/^COT-/i.test(numEl.value))numEl.value=numEl.value.replace(/^COT-/i,"FAC-");
+ else if(!isInvoice&&/^FAC-/i.test(numEl.value))numEl.value=numEl.value.replace(/^FAC-/i,"COT-");
+ render();
+}
+function renderItems(){
+ $("items").innerHTML=items.map((x,i)=>{
+   const isBlank=x.blank===true;
+   return `
+ <div class="item" data-index="${i}" draggable="true"
+      ondragstart="dragStart(event,${i})"
+      ondragover="dragOver(event)"
+      ondragenter="dragEnter(event)"
+      ondragleave="dragLeave(event)"
+      ondrop="dropItem(event,${i})"
+      ondragend="dragEnd(event)">
+   <div class="item-top">
+     <button type="button" class="drag-handle" title="Arrastrar para mover" aria-label="Arrastrar concepto">⠿</button>
+     <input class="item-name" value="${esc(x.name??"")}" placeholder="${isBlank?"Espacio vacío":"Nombre del concepto"}" oninput="items[${i}].name=this.value;items[${i}].blank=false;render()">
+     <div class="item-actions">
+       <button type="button" class="move-btn" title="Mover arriba" aria-label="Mover arriba" ${i===0?"disabled":""} onclick="moveItem(${i},-1)">↑</button>
+       <button type="button" class="move-btn" title="Mover abajo" aria-label="Mover abajo" ${i===items.length-1?"disabled":""} onclick="moveItem(${i},1)">↓</button>
+       <button type="button" class="remove" title="Eliminar concepto" aria-label="Eliminar concepto" onclick="removeItem(${i})">×</button>
+     </div>
+   </div>
+   <textarea class="item-description" rows="2" placeholder="${isBlank?"Espacio vacío":"Descripción del producto o servicio..."}" oninput="items[${i}].description=this.value;items[${i}].blank=false;render()">${esc(x.description??"")}</textarea>
+   <div class="item-bottom">
+     <input type="number" min="0" step=".01" value="${x.qty??""}" placeholder="${isBlank?"":"Cantidad"}" oninput="items[${i}].qty=this.value===''?'':(parseFloat(this.value)||0);items[${i}].blank=false;render()">
+     <input type="number" min="0" step=".01" value="${x.price??""}" placeholder="${isBlank?"":"Precio unitario"}" oninput="items[${i}].price=this.value===''?'':(parseFloat(this.value)||0);items[${i}].blank=false;render()">
+   </div>
+ </div>`;
+ }).join("");
+}
+
+function addItem(){
+ items.push({name:"Nuevo concepto",description:"Descripción del producto o servicio.",qty:1,price:0,blank:false});
+ renderItems();
+ render();
+}
+
+function addBlankItem(){
+ items.push({name:"",description:"",qty:"",price:"",blank:true});
+ renderItems();
+ render();
+}
+
+function removeItem(i){
+ if(items.length>1){
+   items.splice(i,1);
+   renderItems();
+   render();
+ }
+}
+
+function moveItem(i,direction){
+ const target=i+direction;
+ if(target<0 || target>=items.length)return;
+ const temp=items[i];
+ items[i]=items[target];
+ items[target]=temp;
+ renderItems();
+ render();
+}
+
+let draggedIndex=null;
+
+function dragStart(event,i){
+ draggedIndex=i;
+ event.dataTransfer.effectAllowed="move";
+ event.dataTransfer.setData("text/plain",String(i));
+ event.currentTarget.classList.add("dragging");
+}
+
+function dragOver(event){
+ event.preventDefault();
+ event.dataTransfer.dropEffect="move";
+}
+
+function dragEnter(event){
+ event.preventDefault();
+ event.currentTarget.classList.add("drag-over");
+}
+
+function dragLeave(event){
+ event.currentTarget.classList.remove("drag-over");
+}
+
+function dropItem(event,targetIndex){
+ event.preventDefault();
+ event.currentTarget.classList.remove("drag-over");
+ const sourceIndex=draggedIndex!==null?draggedIndex:parseInt(event.dataTransfer.getData("text/plain"),10);
+ if(Number.isNaN(sourceIndex) || sourceIndex===targetIndex)return;
+
+ const [moved]=items.splice(sourceIndex,1);
+ const insertIndex=sourceIndex<targetIndex?targetIndex-1:targetIndex;
+ items.splice(insertIndex,0,moved);
+
+ renderItems();
+ render();
+}
+
+function dragEnd(event){
+ event.currentTarget.classList.remove("dragging","drag-over");
+ draggedIndex=null;
+ document.querySelectorAll("#items .item").forEach(el=>el.classList.remove("drag-over","dragging"));
+}
+
+function render(){
+ const isInvoice=type==="FACTURA";
+ const h1=$("pType");
+ h1.textContent=isInvoice?"FACTURA DE VENTA":"COTIZACIÓN";
+ h1.classList.toggle("long",isInvoice);
+ $("pNumber").textContent=$("number").value||"—";
+ $("pDate").textContent=fmtDate($("date").value);
+ $("pValid").textContent=fmtDate($("valid").value);
+ $("pValidRow").style.display=type==="FACTURA"?"none":"inline";
+
+ $("pCompany").textContent=$("company").value;
+ const companyData=[
+   ["NIT",$("companyId").value],
+   ["TELÉFONO",$("companyPhone").value],
+   ["EMAIL",$("companyEmail").value],
+   ["DIRECCIÓN",$("companyAddress").value]
+ ].filter(([,value])=>value).map(([label,value])=>`<span><b>${label}:</b> ${esc(value)}</span>`);
+ $("pCompanyData").innerHTML=companyData.join("<br>");
+ $("pIssuer").innerHTML=[$("company").value,$("companyId").value,$("companyEmail").value,$("companyPhone").value,$("companyAddress").value].filter(Boolean).map(esc).join("<br>");
+ $("pClient").innerHTML=[$("client").value,$("clientId").value,$("clientEmail").value,$("clientPhone").value,$("clientAddress").value].filter(Boolean).map(esc).join("<br>");
+
+ $("pLogo").src=logoData||"../img/logo.png";
+
+ let sub=0;
+ $("pItems").innerHTML=items.map(x=>{
+   const isBlank=x.blank===true;
+   const total=(isBlank?0:(Number(x.qty)||0)*(Number(x.price)||0));
+   sub+=total;
+   if(isBlank){
+     return `<tr class="blank-row"><td colspan="4"><span class="blank-space"></span></td></tr>`;
+   }
+   return `<tr><td><span class="concept-title">${esc(x.name??"")}</span><span class="concept-desc">${esc(x.description??"").replace(/\n/g,"<br>")}</span></td><td class="right">${x.qty===""||x.qty==null?"":x.qty}</td><td class="right">${x.price===""||x.price==null?"":money(x.price)}</td><td class="right">${total?money(total):""}</td></tr>`;
+ }).join("");
+
+ let rate=parseFloat($("tax").value)||0;
+ let t=sub*rate/100,total=sub+t;
+ $("subtotal").textContent=money(sub);
+ $("taxLabel").textContent=`IVA (${rate}%)`;
+ $("taxValue").textContent=money(t);
+ $("grandTotal").textContent=money(total);
+ $("pNotes").innerHTML=esc($("notes").value).replace(/\n/g,"<br>");
+
+ const bank=$("bank").value.trim();
+ $("pBank").innerHTML=esc(bank).replace(/\n/g,"<br>");
+ $("pBankBox").style.display=bank?"block":"none";
+
+ // ---- Pie legal según tipo de documento ----
+ const num=$("number").value||"________";
+ const fecha=fmtDate($("date").value)||fmtDate(today());
+ if(isInvoice){
+   $("legalBox").innerHTML=
+     '<strong>A este documento aplican las normas relativas a la letra de cambio (Artículo 5, Ley 1231 de 2008).</strong> '+
+     'Con esta el comprador declara haber recibido real y materialmente las mercancías o prestaciones de servicios descritos en este título – valor. '+
+     'Factura de venta N.° "'+esc(num)+'" generada el '+esc(fecha)+'.';
+ }else{
+   $("legalBox").innerHTML=
+     '<strong>Este documento es una cotización electrónica y no constituye una factura de venta ni título valor.</strong> '+
+     'No genera obligaciones tributarias ni cambiarias. Los precios y condiciones aquí indicados son informativos y están sujetos a cambios sin previo aviso. '+
+     'Cotización N.° "'+esc(num)+'" generada el '+esc(fecha)+', vigente hasta la fecha indicada.';
+ }
+ save();
+}
+function state(){
+ let data={type,logoData,items};
+ ["number","date","valid","tax","company","companyId","companyPhone","companyEmail","companyAddress","client","clientId","clientPhone","clientEmail","clientAddress","notes","bank"].forEach(id=>data[id]=$(id).value);
+ return data;
+}
+
+let saveTimer;
+let remoteCode=localStorage.getItem("seardocs_remote_code")||"";
+let remoteSaving=false;
+
+function save(){
+ clearTimeout(saveTimer);
+ saveTimer=setTimeout(()=>{
+   const data=state();
+   try{
+     localStorage.setItem(KEY,JSON.stringify(data));
+   }catch(e){
+     console.warn("SearDocs: no se pudo guardar localmente",e);
+   }
+   if(remoteCode) saveRemoteProgress(false);
+   else $("saveStatus").textContent="Guardado local · "+new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+ },250);
+}
+
+function normalizeItems(list){
+ return (Array.isArray(list)?list:[]).map(x=>({
+   name:x?.name??"",
+   description:x?.description??"",
+   qty:x?.qty??"",
+   price:x?.price??"",
+   blank:x?.blank===true
+ }));
+}
+
+function applyState(d){
+ if(!d || typeof d!=="object")throw new Error("Los datos recibidos no son válidos.");
+ type=d.type==="FACTURA"?"FACTURA":"COTIZACIÓN";
+ logoData=d.logoData||"../img/logo.png";
+ items=normalizeItems(d.items);
+ if(!items.length)items=[{name:"",description:"",qty:"",price:"",blank:true}];
+ ["number","date","valid","tax","company","companyId","companyPhone","companyEmail","companyAddress","client","clientId","clientPhone","clientEmail","clientAddress","notes","bank"].forEach(id=>{
+   if(d[id]!==undefined && $(id))$(id).value=d[id];
+ });
+ $("logoThumb").src=logoData;
+ renderItems();
+ setType(type);
+ render();
+}
+
+function load(){
+ let raw=localStorage.getItem(KEY);
+ if(!raw)return;
+ try{
+   applyState(JSON.parse(raw));
+ }catch(e){
+   console.warn("SearDocs: no se pudo recuperar el documento local",e);
+ }
+}
+
+function setCurrentRemoteCode(code){
+ remoteCode=code||"";
+ if(remoteCode){
+   localStorage.setItem("seardocs_remote_code",remoteCode);
+   $("currentCode").textContent="Código: "+remoteCode;
+   $("currentCode").classList.add("visible");
+ }else{
+   localStorage.removeItem("seardocs_remote_code");
+   $("currentCode").textContent="";
+   $("currentCode").classList.remove("visible");
+ }
+}
+
+async function apiRequest(payload){
+ const response=await fetch("api.php",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify(payload),
+   credentials:"same-origin"
+ });
+ let data=null;
+ try{data=await response.json();}catch(e){throw new Error("El servidor devolvió una respuesta no válida.");}
+ if(!response.ok || !data.ok)throw new Error(data?.message||"No se pudo completar la operación.");
+ return data;
+}
+
+function openShareModal(){
+ $("generatedCode").value=remoteCode||"";
+ $("shareStatus").textContent=remoteCode
+   ?"Este documento ya está vinculado al código indicado. Puedes actualizarlo o generar uno nuevo."
+   :"Genera un código para compartir este progreso.";
+ $("shareModal").classList.add("open");
+ setTimeout(()=>$("generatedCode").focus(),50);
+}
+
+function openLoadModal(){
+ $("loadStatus").textContent="";
+ $("loadCode").value="";
+ $("loadModal").classList.add("open");
+ setTimeout(()=>$("loadCode").focus(),50);
+}
+
+function closeRemoteModals(){
+ document.querySelectorAll(".remote-modal").forEach(m=>m.classList.remove("open"));
+}
+
+function formatRemoteCode(value){
+ return String(value||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,16);
+}
+
+async function saveRemoteProgress(generateNew=false){
+ if(remoteSaving)return;
+ remoteSaving=true;
+ try{
+   $("saveStatus").textContent="Guardando en servidor…";
+   const result=await apiRequest({
+     action:"save",
+     code:generateNew?"":remoteCode,
+     data:state()
+   });
+   setCurrentRemoteCode(result.code);
+   $("saveStatus").textContent="Guardado en servidor · "+new Date().toLocaleTimeString("es-CO",{hour:"2-digit",minute:"2-digit"});
+   if(generateNew){
+     $("generatedCode").value=result.code;
+     $("shareStatus").textContent="Código generado. Compártelo con la otra persona.";
+   }
+ }catch(e){
+   $("saveStatus").textContent="Guardado local · servidor no disponible";
+   if(generateNew)$("shareStatus").textContent=e.message;
+   console.error("SearDocs:",e);
+ }finally{
+   remoteSaving=false;
+ }
+}
+
+async function loadRemoteProgress(){
+ const code=formatRemoteCode($("loadCode").value);
+ if(code.length<12){
+   $("loadStatus").textContent="Introduce un código válido.";
+   return;
+ }
+ try{
+   $("loadStatus").textContent="Cargando…";
+   const result=await apiRequest({action:"load",code});
+   applyState(result.data);
+   setCurrentRemoteCode(code);
+   localStorage.setItem(KEY,JSON.stringify(state()));
+   $("loadStatus").textContent="Progreso cargado correctamente.";
+   $("saveStatus").textContent="Progreso cargado desde servidor";
+   setTimeout(closeRemoteModals,500);
+ }catch(e){
+   $("loadStatus").textContent=e.message;
+ }
+}
+
+async function copyGeneratedCode(){
+ const code=$("generatedCode").value.trim();
+ if(!code)return;
+ try{
+   await navigator.clipboard.writeText(code);
+   $("shareStatus").textContent="Código copiado al portapapeles.";
+ }catch(e){
+   $("generatedCode").select();
+   document.execCommand("copy");
+   $("shareStatus").textContent="Código seleccionado/copied. Puedes copiarlo manualmente.";
+ }
+}
+
+$("logo").addEventListener("change",e=>{
+ const f=e.target.files[0];
+ if(!f)return;
+ const r=new FileReader();
+ r.onload=()=>{
+   logoData=r.result;
+   $("logoThumb").src=logoData;
+   render();
+ };
+ r.readAsDataURL(f);
+});
+function resetDoc(){
+ if(!confirm("¿Crear un documento nuevo? El progreso local será eliminado y el documento dejará de estar vinculado al código remoto actual."))return;
+ localStorage.removeItem(KEY);
+ localStorage.removeItem("seardocs_remote_code");
+ location.reload();
+}
+document.querySelectorAll(".remote-modal").forEach(modal=>{
+ modal.addEventListener("click",e=>{
+   if(e.target===modal)closeRemoteModals();
+ });
+});
+document.addEventListener("keydown",e=>{
+ if(e.key==="Escape")closeRemoteModals();
+});
+$("loadCode").addEventListener("input",e=>{
+ e.target.value=formatRemoteCode(e.target.value);
+});
+
+function toggleNav(){
+ const nav=document.querySelector(".sear-nav-links");
+ if(!nav)return;
+ nav.classList.toggle("open");
+}
+document.querySelectorAll(".sear-nav-links a").forEach(link=>{
+ link.addEventListener("click",()=>document.querySelector(".sear-nav-links")?.classList.remove("open"));
+});
+window.addEventListener("resize",()=>{
+ if(window.innerWidth>900)document.querySelector(".sear-nav-links")?.classList.remove("open");
+});
+// Convierte un <img> a data URL in situ para evitar lienzos "tainted" (CORS/file://)
+// y garantizar que la imagen esté completamente cargada antes de capturar.
+async function inlineImage(img){
+ try{
+   const src=img.getAttribute("src")||"";
+   if(!src||src.startsWith("data:")){
+     if(!(img.complete&&img.naturalWidth>0)){
+       await new Promise(res=>{img.addEventListener("load",res,{once:true});img.addEventListener("error",res,{once:true});});
+     }
+     return;
+   }
+   const resp=await fetch(src,{cache:"force-cache"});
+   if(!resp.ok) throw new Error("HTTP "+resp.status);
+   const blob=await resp.blob();
+   const dataUrl=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(blob);});
+   img.src=dataUrl;
+   await new Promise(res=>{img.addEventListener("load",res,{once:true});img.addEventListener("error",res,{once:true});});
+ }catch(_){
+   // Si no se puede convertir, al menos esperamos a la carga original.
+   if(!(img.complete&&img.naturalWidth>0)){
+     await new Promise(res=>{img.addEventListener("load",res,{once:true});img.addEventListener("error",res,{once:true});});
+   }
+ }
+}
+
+async function storePdfOnServer(folder,filename,base64){
+ if(!base64) return;
+ const res=await fetch("api.php",{
+   method:"POST",
+   headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({action:"savepdf",folder:folder,filename:filename,pdf:base64})
+ });
+ let data={};
+ try{ data=await res.json(); }catch(_){}
+ if(!res.ok||!data.ok){
+   throw new Error((data&&data.message)||"No se pudo archivar el PDF en el servidor.");
+ }
+ return data;
+}
+
+async function exportPDF(){
+ const btn=document.querySelector('.actions .btn.primary');
+ const prevLabel=btn?btn.textContent:"";
+ const paper=$("paper");
+ if(btn){btn.disabled=true;btn.textContent="Generando PDF…";}
+ try{
+   // Espera a que las librerías (local o respaldo CDN) terminen de cargar.
+   if(window.__seardocsLibsReady){try{await window.__seardocsLibsReady;}catch(_){}}
+   if(!window.jspdf||!window.jspdf.jsPDF||typeof html2canvas!=="function"){
+     throw new Error("No se pudieron cargar las librerías para generar el PDF. Recarga la página e inténtalo de nuevo; si el problema continúa, verifica que la carpeta \"vendor\" esté subida junto a esta página.");
+   }
+   // Espera a que las fuentes web terminen de cargar (evita textos desplazados).
+   if(document.fonts&&document.fonts.ready){try{await document.fonts.ready;}catch(_){}}
+   // Incrusta las imágenes y espera su carga para evitar el error de "lienzo contaminado".
+   await Promise.all(Array.from(paper.querySelectorAll("img")).map(inlineImage));
+
+   const canvas=await html2canvas(paper,{
+     scale:2,useCORS:true,allowTaint:false,backgroundColor:"#fff",
+     logging:false,imageTimeout:15000,
+     windowWidth:paper.scrollWidth,windowHeight:paper.scrollHeight
+   });
+
+   const {jsPDF}=window.jspdf;
+   const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+   const pageW=210,pageH=297;
+   // Alto (en px del canvas) que cabe en una hoja A4 conservando la proporción.
+   const pxPerPage=Math.floor(canvas.width*pageH/pageW);
+   const totalPages=Math.max(1,Math.ceil(canvas.height/pxPerPage));
+
+   for(let p=0;p<totalPages;p++){
+     const sliceH=Math.min(pxPerPage,canvas.height-p*pxPerPage);
+     const pageCanvas=document.createElement("canvas");
+     pageCanvas.width=canvas.width;
+     pageCanvas.height=sliceH;
+     const ctx=pageCanvas.getContext("2d");
+     ctx.fillStyle="#fff";ctx.fillRect(0,0,pageCanvas.width,pageCanvas.height);
+     ctx.drawImage(canvas,0,p*pxPerPage,canvas.width,sliceH,0,0,canvas.width,sliceH);
+     const imgData=pageCanvas.toDataURL("image/jpeg",0.95);
+     const renderH=sliceH*pageW/canvas.width; // alto real de esta porción en mm
+     if(p>0)pdf.addPage();
+     pdf.addImage(imgData,"JPEG",0,0,pageW,renderH,undefined,"FAST");
+   }
+
+   const isInvoice=type==="FACTURA";
+   const folder=isInvoice?"Facturas":"Cotizaciones";
+   const prefix=isInvoice?"Factura":"Cotizacion";
+   const n=($("number").value||"documento").replace(/[^a-z0-9_-]/gi,"_");
+   const fileName=`${prefix}_${n}.pdf`;
+   // Descarga local para el usuario
+   pdf.save(fileName);
+   // Archivado en el servidor dentro de la carpeta correspondiente (Cotizaciones / Facturas)
+   try{
+     const base64=(pdf.output("datauristring").split(",")[1])||"";
+     await storePdfOnServer(folder,fileName,base64);
+     if(btn){btn.textContent="PDF guardado en "+folder+" ✓";}
+   }catch(e){
+     console.warn("SearDocs: no se pudo archivar el PDF en el servidor",e);
+   }
+ }catch(err){
+   console.error("SearDocs PDF:",err);
+   let msg=err&&err.message?err.message:"No se pudo generar el PDF. Inténtalo de nuevo.";
+   if(err&&(err.name==="SecurityError"||/tainted|secur/i.test(String(err.message)))){
+     msg="No se pudo exportar el PDF porque el logo no permite copiarse (restricción CORS). Sube el logo desde el editor o abre la página desde un servidor web (http/https), no con doble clic (file://).";
+   }
+   alert(msg);
+ }finally{
+   if(btn){btn.disabled=false;btn.textContent=prevLabel;}
+ }
+}
+
+$("date").value=today();
+let d=new Date();d.setDate(d.getDate()+15);
+$("valid").value=new Date(d-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
+load();
+renderItems();
+setType(type);
+render();
+setCurrentRemoteCode(remoteCode);
+</script>
+</body>
+</html>
